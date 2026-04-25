@@ -20,6 +20,7 @@ export default function ChaosView() {
   const attractorX = trailing30Data.map(d => d.chaos.attractor_coords[0]);
   const attractorY = trailing30Data.map(d => d.chaos.attractor_coords[1]);
   const attractorZ = trailing30Data.map(d => d.chaos.attractor_coords[2]);
+  const attractorColor = trailing30Data.map(d => d.chaos.lyapunov);
 
   // Health Gauge logic
   const health = currentTick.chaos.health_score;
@@ -34,8 +35,17 @@ export default function ChaosView() {
 
       {/* 3D Attractor */}
       <div className="flex-1 min-h-[250px] bg-[#111] border border-[#333] overflow-hidden relative p-3">
-        <h3 className="text-xs text-stone-500 absolute top-3 left-3 z-10 uppercase">Phase Space Attractor [30D delay-coord]</h3>
-        <div className="w-full h-full flex items-center justify-center">
+        <div className="absolute top-3 left-3 z-10">
+          <h3 className="text-xs text-stone-300 uppercase font-bold">Phase Space Attractor [30D]</h3>
+          <p className="text-[10px] text-stone-500 mt-1 uppercase">
+            {isCritical ? (
+               <span className="text-amber-500 font-bold">⚠️ WIDE DISPERSION: High systemic stress (BAD)</span>
+            ) : (
+               <span className="text-emerald-500 font-bold">✓ TIGHT CLUSTERS: Stable equilibrium (GOOD)</span>
+            )}
+          </p>
+        </div>
+        <div className="w-full h-full flex items-center justify-center pt-8">
           <Plot
             data={[
               {
@@ -45,13 +55,15 @@ export default function ChaosView() {
                 type: 'scatter3d',
                 mode: 'lines+markers',
                 marker: {
-                  size: 3,
-                  color: attractorZ,
-                  colorscale: 'YlOrRd',
+                  size: 4,
+                  color: attractorColor,
+                  colorscale: 'Portland',
+                  cmin: -0.2,
+                  cmax: 1.5,
                 },
                 line: {
-                  color: '#d97706',
-                  width: 1.5,
+                  color: '#444',
+                  width: 1,
                 },
               },
             ]}
@@ -61,10 +73,10 @@ export default function ChaosView() {
               paper_bgcolor: 'rgba(0,0,0,0)',
               plot_bgcolor: 'rgba(0,0,0,0)',
               scene: {
-                xaxis: { showbackground: false, showgrid: true, gridcolor: '#333', zeroline: false, showticklabels: false },
-                yaxis: { showbackground: false, showgrid: true, gridcolor: '#333', zeroline: false, showticklabels: false },
-                zaxis: { showbackground: false, showgrid: true, gridcolor: '#333', zeroline: false, showticklabels: false },
-                camera: { eye: { x: 1.5, y: 1.5, z: 0.5 } }
+                xaxis: { title: { text: 'P(t)', font: { color: '#888', size: 10 } }, showbackground: false, showgrid: true, gridcolor: '#333', zeroline: false, showticklabels: true, tickfont: { color: '#888', size: 10 } },
+                yaxis: { title: { text: 'P(t-21)', font: { color: '#888', size: 10 } }, showbackground: false, showgrid: true, gridcolor: '#333', zeroline: false, showticklabels: true, tickfont: { color: '#888', size: 10 } },
+                zaxis: { title: { text: 'P(t-42)', font: { color: '#888', size: 10 } }, showbackground: false, showgrid: true, gridcolor: '#333', zeroline: false, showticklabels: true, tickfont: { color: '#888', size: 10 } },
+                camera: { eye: { x: 1.8, y: 1.8, z: 0.8 } }
               }
             }}
             useResizeHandler={true}

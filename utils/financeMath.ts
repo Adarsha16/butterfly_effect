@@ -79,14 +79,24 @@ export function calculateIndicators(data: RawData[]): DataTick[] {
     else if (currentPrice > ma) signal = "Bullish - Hold";
     else signal = "Bearish - Hold";
     
-    // Chaos Metrics: 60-day Rolling Variance & AR(1) Autocorrelation
-    // Increased window to 60 days to capture macro critical slowing down
-    let variance60d = 0;
+    // Chaos Metrics: 21-day Rolling Variance & AR(1) Autocorrelation
+    // Decreased window to 21 days (1 trading month) to reduce lag and catch signals earlier.
+    let variance21d = 0;
     let ar1 = 0;
-    if (i >= 60) {
-      const retSlice = logReturns.slice(i - 59, i + 1);
-      const mean = retSlice.reduce((a, b) => a + b, 0) / 60;
-      variance60d = retSlice.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / 60;
+    let longTermVariance = 0;
+
+    // Calculate long-term baseline variance (up to 252 days)
+    const longTermLookback = Math.min(i + 1, 252);
+    if (longTermLookback > 1) {
+      const longSlice = logReturns.slice(Math.max(0, i - 251), i + 1);
+      const longMean = longSlice.reduce((a, b) => a + b, 0) / longSlice.length;
+      longTermVariance = longSlice.reduce((a, b) => a + Math.pow(b - longMean, 2), 0) / longSlice.length;
+    }
+
+    if (i >= 21) {
+      const retSlice = logReturns.slice(i - 20, i + 1);
+      const mean = retSlice.reduce((a, b) => a + b, 0) / 21;
+      variance21d = retSlice.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / 21;
       
       let numerator = 0;
       let denominator = 0;
@@ -97,15 +107,16 @@ export function calculateIndicators(data: RawData[]): DataTick[] {
       ar1 = denominator === 0 ? 0 : numerator / denominator;
     }
     
-    // Proxy for Lyapunov Exponent (Critical Slowing Down)
-    // Scaled so 2007 structural instability hits > 1.0 early
-    const varianceScale = variance60d * 12000; // Increased multiplier
-    let rawLyapunov = (ar1 * 1.5) + (varianceScale * 0.8) - 0.2; // Baseline shift so normal times are lower
-    rawLyapunov = Math.max(-0.2, rawLyapunov);
+    // Asset-Agnostic Volatility Ratio
+    const volRatio = longTermVariance > 0 ? (variance21d / longTermVariance) : 1.0;
     
-    // Smooth the Lyapunov proxy with an EMA so it doesn't dip back to non-critical abruptly
-    // right before the crash when volatility briefly tightens.
-    const alpha = 0.1; // Smoothing factor (lower = smoother, holds high values longer)
+    // Proxy for Lyapunov Exponent based on true Chaos Theory definitions
+    // Measures logarithmic divergence of volatility combined with Critical Slowing Down (AR(1))
+    const logDiv = Math.log(Math.max(0.01, volRatio));
+    let rawLyapunov = ar1 + logDiv; 
+    
+    // Smooth the Lyapunov proxy with an EMA
+    const alpha = 0.2; // Smoothing factor (increased from 0.1 to reduce lag)
     lyapunovEma = i === 0 ? rawLyapunov : (rawLyapunov * alpha) + (lyapunovEma * (1 - alpha));
     
     // Delay Coordinate Embedding for Phase Space Attractor (Takens' Theorem)
@@ -133,7 +144,7 @@ export function calculateIndicators(data: RawData[]): DataTick[] {
       },
       chaos: {
         lyapunov: parseFloat(lyapunovEma.toFixed(3)),
-        variance_30d_pct_change: parseFloat(varianceScale.toFixed(2)), // Keep object property name consistent
+        variance_30d_pct_change: parseFloat(volRatio.toFixed(2)), // Keep object property name consistent
         health_score: Math.round(health),
         attractor_coords: [parseFloat(cx.toFixed(3)), parseFloat(cy.toFixed(3)), parseFloat(cz.toFixed(3))]
       }

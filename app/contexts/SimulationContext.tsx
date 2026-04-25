@@ -14,6 +14,7 @@ type SimulationContextType = {
   reset: () => void;
   currentTick: DataTick | null;
   loadCustomData: (csvString: string) => void;
+  loadYahooData: (ticker?: string, period1?: string, period2?: string) => Promise<void>;
   isLoadingData: boolean;
 };
 
@@ -26,18 +27,31 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   const [playbackSpeed, setPlaybackSpeed] = useState(1); // 1x, 2x, 4x, etc
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  useEffect(() => {
+  const loadYahooData = async (ticker: string = '^GSPC', period1?: string, period2?: string) => {
     setIsLoadingData(true);
-    fetch('/api/yahoo')
-      .then((res) => res.json())
-      .then((json) => {
+    let url = `/api/yahoo?ticker=${encodeURIComponent(ticker)}`;
+    if (period1) url += `&period1=${encodeURIComponent(period1)}`;
+    if (period2) url += `&period2=${encodeURIComponent(period2)}`;
+
+    try {
+      const res = await fetch(url);
+      const json = await res.json();
+      if (Array.isArray(json)) {
         setData(json);
-        setIsLoadingData(false);
-      })
-      .catch((err) => {
-        console.error("Failed to load Yahoo Finance data", err);
-        setIsLoadingData(false);
-      });
+        setCurrentIndex(0);
+      } else {
+        console.error("API returned non-array:", json);
+        alert(`Failed to load data: ${json.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error("Failed to load Yahoo Finance data", err);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    loadYahooData('^GSPC', '2006-01-01', '2008-12-31'); // Default to Historical Crash of 2008
   }, []);
 
   useEffect(() => {
@@ -102,7 +116,7 @@ export const SimulationProvider = ({ children }: { children: ReactNode }) => {
   const currentTick = data.length > 0 ? data[currentIndex] : null;
 
   return (
-    <SimulationContext.Provider value={{ data, currentIndex, setCurrentIndex, isPlaying, togglePlay, playbackSpeed, setPlaybackSpeed, reset, currentTick, loadCustomData, isLoadingData }}>
+    <SimulationContext.Provider value={{ data, currentIndex, setCurrentIndex, isPlaying, togglePlay, playbackSpeed, setPlaybackSpeed, reset, currentTick, loadCustomData, loadYahooData, isLoadingData }}>
       {children}
     </SimulationContext.Provider>
   );

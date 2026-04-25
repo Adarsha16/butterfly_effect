@@ -2,6 +2,7 @@
 import React, { useRef } from 'react';
 import { RotateCcw, Upload, Activity, Play, Pause } from 'lucide-react';
 import { useSimulation } from '@/app/contexts/SimulationContext';
+import AssetSelector from './AssetSelector';
 
 export default function Header() {
   const { data, currentIndex, setCurrentIndex, isPlaying, togglePlay, playbackSpeed, setPlaybackSpeed, reset, currentTick, loadCustomData, isLoadingData } = useSimulation();
@@ -44,6 +45,7 @@ export default function Header() {
           </h1>
           <p className="text-xs text-stone-400">Data Feed: {isLoadingData ? 'Loading API...' : `Connected (${data.length} ticks)`}</p>
         </div>
+        <AssetSelector />
       </div>
 
       {/* Timeline Scrubber */}

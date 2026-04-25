@@ -1,49 +1,40 @@
 "use client";
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSimulation } from '@/app/contexts/SimulationContext';
-import { Activity, AlertOctagon, TerminalSquare, Database } from 'lucide-react';
+import { Activity, AlertOctagon, TerminalSquare, Database, Cpu } from 'lucide-react';
 
 export default function QuantCopilot() {
-  const { currentTick, currentIndex } = useSimulation();
+  const { data, currentTick, currentIndex } = useSimulation();
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPayload, setShowPayload] = useState(false);
   const [displayedText, setDisplayedText] = useState("");
-  const lastAnalyzedIndex = useRef(-1);
 
   const isCritical = (currentTick?.chaos?.lyapunov ?? 0) > 1.0;
 
-  // Trigger analysis every 10 ticks, or if lyapunov > 1.0
-  useEffect(() => {
+  const fetchAnalysis = async () => {
     if (!currentTick) return;
-
-    const isCriticalNow = currentTick.chaos.lyapunov > 1.0;
-    const shouldTrigger = (currentIndex > 0 && currentIndex % 10 === 0) || (isCriticalNow && lastAnalyzedIndex.current !== currentIndex);
-
-    if (shouldTrigger && lastAnalyzedIndex.current !== currentIndex) {
-      lastAnalyzedIndex.current = currentIndex;
-      
-      const fetchAnalysis = async () => {
-        setLoading(true);
-        try {
-          const res = await fetch('/api/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(currentTick)
-          });
-          const data = await res.json();
-          setAnalysis(data.summary);
-        } catch (e) {
-          console.error(e);
-          setAnalysis("SYS_ERR: Failed to synthesize risk state. Computation Core Offline.");
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchAnalysis();
+    setLoading(true);
+    setAnalysis(null);
+    setDisplayedText("");
+    
+    const historicalContext = data.slice(Math.max(0, currentIndex - 30), currentIndex + 1);
+    
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentTick, historicalContext })
+      });
+      const responseData = await res.json();
+      setAnalysis(responseData.summary);
+    } catch (e) {
+      console.error(e);
+      setAnalysis("SYS_ERR: Failed to synthesize risk state. Computation Core Offline.");
+    } finally {
+      setLoading(false);
     }
-  }, [currentIndex, currentTick]);
+  };
 
   // Terminal typewriter effect
   useEffect(() => {
@@ -78,8 +69,8 @@ export default function QuantCopilot() {
         </div>
       </div>
 
-      <div className={`flex-1 overflow-hidden bg-[#111] border ${isCritical ? 'border-amber-700/50' : 'border-[#333]'} p-4 text-sm transition-colors duration-200`}>
-        <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[#444]">
+      <div className={`flex-1 overflow-hidden bg-[#111] border ${isCritical ? 'border-amber-700/50' : 'border-[#333]'} p-4 text-sm transition-colors duration-200 flex flex-col`}>
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#444] mb-3">
           {loading ? (
             <div className="text-stone-400 flex items-center gap-3 mt-2">
               <Database className="w-4 h-4 animate-pulse" />
@@ -95,10 +86,19 @@ export default function QuantCopilot() {
           ) : (
             <div className="text-[#555] mt-2 flex items-center gap-2 text-xs uppercase">
               <TerminalSquare className="w-4 h-4" />
-              Awaiting sufficient data blocks...
+              Awaiting manual analyst request...
             </div>
           )}
         </div>
+        
+        <button 
+          onClick={fetchAnalysis}
+          disabled={loading || !currentTick}
+          className={`w-full py-2 text-xs font-bold uppercase border transition-colors flex items-center justify-center gap-2 ${loading ? 'bg-[#222] text-stone-500 border-[#333] cursor-not-allowed' : 'bg-[#1a1a1a] text-stone-300 border-[#444] hover:bg-[#333] hover:text-amber-400'}`}
+        >
+          <Cpu className="w-4 h-4" />
+          {loading ? 'Synthesizing...' : 'Get Expert Assistance'}
+        </button>
       </div>
 
       <div className="mt-auto">
@@ -111,7 +111,12 @@ export default function QuantCopilot() {
         
         {showPayload && currentTick && (
           <div className="mt-2 p-3 bg-[#0a0a0a] text-[10px] text-green-600/80 font-mono overflow-x-auto h-[160px] overflow-y-auto border border-[#222]">
-            <pre>{JSON.stringify(currentTick, null, 2)}</pre>
+            <pre>
+              {JSON.stringify({ 
+                currentTick, 
+                historicalContextLength: data.slice(Math.max(0, currentIndex - 30), currentIndex + 1).length 
+              }, null, 2)}
+            </pre>
           </div>
         )}
       </div>
