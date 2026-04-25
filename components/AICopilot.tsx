@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSimulation } from '@/app/contexts/SimulationContext';
 import { Activity, AlertOctagon, TerminalSquare, Database, Cpu } from 'lucide-react';
 
@@ -9,17 +9,23 @@ export default function QuantCopilot() {
   const [loading, setLoading] = useState(false);
   const [showPayload, setShowPayload] = useState(false);
   const [displayedText, setDisplayedText] = useState("");
+  const requestIdRef = useRef(0);
+  const lastAutoKeyRef = useRef<string>('');
 
-  const isCritical = (currentTick?.chaos?.lyapunov ?? 0) > 1.0;
+  const isCritical =
+    (currentTick?.chaos?.early_warning_index ?? 0) >= 70 ||
+    (currentTick?.chaos?.instability_probability ?? 0) >= 65;
 
-  const fetchAnalysis = async () => {
+  const fetchAnalysis = useCallback(async () => {
     if (!currentTick) return;
+
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setAnalysis(null);
     setDisplayedText("");
-    
+
     const historicalContext = data.slice(Math.max(0, currentIndex - 30), currentIndex + 1);
-    
+
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
@@ -27,14 +33,34 @@ export default function QuantCopilot() {
         body: JSON.stringify({ currentTick, historicalContext })
       });
       const responseData = await res.json();
-      setAnalysis(responseData.summary);
+      if (requestId === requestIdRef.current) {
+        setAnalysis(responseData.summary);
+      }
     } catch (e) {
       console.error(e);
-      setAnalysis("SYS_ERR: Failed to synthesize risk state. Computation Core Offline.");
+      if (requestId === requestIdRef.current) {
+        setAnalysis("SYS_ERR: Failed to synthesize risk state. Computation Core Offline.");
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [currentIndex, currentTick, data]);
+
+  // Auto-trigger synthesis when user scrubs timeline or playback advances.
+  useEffect(() => {
+    if (!currentTick || data.length === 0) return;
+    const autoKey = `${currentTick.date}-${currentIndex}`;
+    if (lastAutoKeyRef.current === autoKey) return;
+
+    const timer = setTimeout(() => {
+      lastAutoKeyRef.current = autoKey;
+      fetchAnalysis();
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [currentIndex, currentTick, data.length, fetchAnalysis]);
 
   // Terminal typewriter effect
   useEffect(() => {
@@ -90,8 +116,8 @@ export default function QuantCopilot() {
             </div>
           )}
         </div>
-        
-        <button 
+
+        <button
           onClick={fetchAnalysis}
           disabled={loading || !currentTick}
           className={`w-full py-2 text-xs font-bold uppercase border transition-colors flex items-center justify-center gap-2 ${loading ? 'bg-[#222] text-stone-500 border-[#333] cursor-not-allowed' : 'bg-[#1a1a1a] text-stone-300 border-[#444] hover:bg-[#333] hover:text-amber-400'}`}
@@ -102,19 +128,19 @@ export default function QuantCopilot() {
       </div>
 
       <div className="mt-auto">
-        <button 
+        <button
           onClick={() => setShowPayload(!showPayload)}
           className={`w-full py-2 text-[10px] font-bold uppercase border transition-colors ${showPayload ? 'bg-[#222] text-amber-500 border-amber-900/50' : 'bg-[#111] text-stone-400 border-[#333] hover:bg-[#222] hover:text-stone-200'}`}
         >
           {showPayload ? '[- CLOSE SYS_LOGS]' : '[+ VIEW SYS_LOGS]'}
         </button>
-        
+
         {showPayload && currentTick && (
           <div className="mt-2 p-3 bg-[#0a0a0a] text-[10px] text-green-600/80 font-mono overflow-x-auto h-[160px] overflow-y-auto border border-[#222]">
             <pre>
-              {JSON.stringify({ 
-                currentTick, 
-                historicalContextLength: data.slice(Math.max(0, currentIndex - 30), currentIndex + 1).length 
+              {JSON.stringify({
+                currentTick,
+                historicalContextLength: data.slice(Math.max(0, currentIndex - 30), currentIndex + 1).length
               }, null, 2)}
             </pre>
           </div>

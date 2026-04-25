@@ -9,7 +9,7 @@ const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 export default function ChaosView() {
   const { data, currentIndex, currentTick, isLoadingData } = useSimulation();
-  
+
   const visibleData = data.slice(0, currentIndex + 1);
   const trailing30Data = visibleData.slice(Math.max(0, visibleData.length - 30));
 
@@ -20,11 +20,11 @@ export default function ChaosView() {
   const attractorX = trailing30Data.map(d => d.chaos.attractor_coords[0]);
   const attractorY = trailing30Data.map(d => d.chaos.attractor_coords[1]);
   const attractorZ = trailing30Data.map(d => d.chaos.attractor_coords[2]);
-  const attractorColor = trailing30Data.map(d => d.chaos.lyapunov);
+  const attractorColor = trailing30Data.map(d => d.chaos.early_warning_index);
 
   // Health Gauge logic
   const health = currentTick.chaos.health_score;
-  const isCritical = currentTick.chaos.lyapunov > 1.0;
+  const isCritical = currentTick.chaos.early_warning_index >= 70 || currentTick.chaos.instability_probability >= 65;
 
   return (
     <div className="p-4 border-r border-[#333] bg-[#0a0a0a] h-full flex flex-col gap-4 col-span-4 font-mono">
@@ -39,9 +39,9 @@ export default function ChaosView() {
           <h3 className="text-xs text-stone-300 uppercase font-bold">Phase Space Attractor [30D]</h3>
           <p className="text-[10px] text-stone-500 mt-1 uppercase">
             {isCritical ? (
-               <span className="text-amber-500 font-bold">⚠️ WIDE DISPERSION: High systemic stress (BAD)</span>
+              <span className="text-amber-500 font-bold">⚠️ WIDE DISPERSION: High systemic stress (BAD)</span>
             ) : (
-               <span className="text-emerald-500 font-bold">✓ TIGHT CLUSTERS: Stable equilibrium (GOOD)</span>
+              <span className="text-emerald-500 font-bold">✓ TIGHT CLUSTERS: Stable equilibrium (GOOD)</span>
             )}
           </p>
         </div>
@@ -58,8 +58,8 @@ export default function ChaosView() {
                   size: 4,
                   color: attractorColor,
                   colorscale: 'Portland',
-                  cmin: -0.2,
-                  cmax: 1.5,
+                  cmin: 0,
+                  cmax: 100,
                 },
                 line: {
                   color: '#444',
@@ -90,7 +90,12 @@ export default function ChaosView() {
       <div className={`p-3 border flex items-center justify-between ${isCritical ? 'bg-amber-950/20 border-amber-800' : 'bg-[#111] border-[#333]'}`}>
         <div>
           <h3 className="text-xs text-stone-500 uppercase">System Stability Index</h3>
-          <p className="text-[10px] text-stone-600 uppercase mt-1">Structural Health</p>
+          <p className="text-[10px] text-stone-600 uppercase mt-1">
+            EWI {currentTick.chaos.early_warning_index} | Crash Prob {currentTick.chaos.instability_probability}%
+          </p>
+          <p className="text-[10px] text-stone-600 uppercase mt-1">
+            Mkt {currentTick.chaos.market_stress} | Curve {currentTick.chaos.curve_stress} | Breadth {currentTick.chaos.breadth_stress}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="text-right">
@@ -98,25 +103,29 @@ export default function ChaosView() {
               {health}
             </span>
             <span className="text-stone-600 text-xs ml-1">/ 100</span>
+            <p className="text-[10px] text-stone-500 mt-1 uppercase">
+              Lead Time: {currentTick.chaos.lead_time_days}d
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Lyapunov / Variance Chart */}
+      {/* Predictive Chaos Chart */}
       <div className="h-[200px] bg-[#111] border border-[#333] p-3 relative">
-        <h3 className="text-xs text-stone-500 mb-2 uppercase">Lyapunov Proxy / Volatility</h3>
+        <h3 className="text-xs text-stone-500 mb-2 uppercase">Early Warning / Crash Probability / Market Stress</h3>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={visibleData}>
             <CartesianGrid strokeDasharray="2 4" stroke="#222" />
-            <XAxis dataKey="date" stroke="#555" tick={{fontSize: 10, fill: '#888'}} tickMargin={10} minTickGap={30} />
-            <YAxis yAxisId="left" stroke="#d97706" tick={{fontSize: 10, fill: '#888'}} width={30} />
-            <YAxis yAxisId="right" orientation="right" stroke="#0284c7" tick={{fontSize: 10, fill: '#888'}} width={30} />
-            <Tooltip 
-              contentStyle={{backgroundColor: '#000', borderColor: '#444', fontFamily: 'monospace', fontSize: '11px', color: '#ccc'}} 
+            <XAxis dataKey="date" stroke="#555" tick={{ fontSize: 10, fill: '#888' }} tickMargin={10} minTickGap={30} />
+            <YAxis yAxisId="left" domain={[0, 100]} stroke="#d97706" tick={{ fontSize: 10, fill: '#888' }} width={30} />
+            <YAxis yAxisId="right" domain={[0, 100]} orientation="right" stroke="#0284c7" tick={{ fontSize: 10, fill: '#888' }} width={30} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#000', borderColor: '#444', fontFamily: 'monospace', fontSize: '11px', color: '#ccc' }}
             />
-            <ReferenceLine yAxisId="left" y={1.0} stroke="#d97706" strokeDasharray="3 3" />
-            <Line yAxisId="left" type="monotone" dataKey="chaos.lyapunov" stroke="#d97706" dot={false} strokeWidth={1.5} name="Lyapunov Proxy" isAnimationActive={false} />
-            <Line yAxisId="right" type="monotone" dataKey="chaos.variance_30d_pct_change" stroke="#0284c7" dot={false} strokeWidth={1.5} name="Variance (scaled)" isAnimationActive={false} />
+            <ReferenceLine yAxisId="left" y={70} stroke="#d97706" strokeDasharray="3 3" />
+            <Line yAxisId="left" type="monotone" dataKey="chaos.early_warning_index" stroke="#d97706" dot={false} strokeWidth={1.5} name="Early Warning Index" isAnimationActive={false} />
+            <Line yAxisId="right" type="monotone" dataKey="chaos.instability_probability" stroke="#0284c7" dot={false} strokeWidth={1.5} name="Crash Probability %" isAnimationActive={false} />
+            <Line yAxisId="right" type="monotone" dataKey="chaos.market_stress" stroke="#f43f5e" dot={false} strokeWidth={1.2} strokeDasharray="4 3" name="Market Stress" isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
