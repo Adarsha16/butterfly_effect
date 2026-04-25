@@ -1,31 +1,97 @@
 "use client";
-import React from 'react';
-import { Play, Pause, FastForward, RotateCcw } from 'lucide-react';
+import React, { useRef } from 'react';
+import { RotateCcw, Upload, Activity, Play, Pause } from 'lucide-react';
 import { useSimulation } from '@/app/contexts/SimulationContext';
 
 export default function Header() {
-  const { isPlaying, togglePlay, fastForward, reset, speedMs, currentTick } = useSimulation();
+  const { data, currentIndex, setCurrentIndex, isPlaying, togglePlay, playbackSpeed, setPlaybackSpeed, reset, currentTick, loadCustomData, isLoadingData } = useSimulation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      loadCustomData(text);
+    };
+    reader.readAsText(file);
+    
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleScrubberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCurrentIndex(Number(e.target.value));
+  };
+
+  const cycleSpeed = () => {
+    if (playbackSpeed === 1) setPlaybackSpeed(2);
+    else if (playbackSpeed === 2) setPlaybackSpeed(4);
+    else if (playbackSpeed === 4) setPlaybackSpeed(10);
+    else setPlaybackSpeed(1);
+  };
 
   return (
-    <header className="flex justify-between items-center p-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
-      <div>
-        <h1 className="text-xl font-bold text-slate-100">Project Name</h1>
-        <p className="text-sm text-slate-400">Simulated Real-Time Feed: S&P 500 (2007-2008)</p>
+    <header className="flex flex-col md:flex-row justify-between items-center p-3 border-b border-[#333] bg-[#111] font-mono gap-4">
+      <div className="flex items-center gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-amber-500 uppercase tracking-wider flex items-center gap-2">
+            <Activity className="w-5 h-5" /> Quant-Terminal v2.1
+          </h1>
+          <p className="text-xs text-stone-400">Data Feed: {isLoadingData ? 'Loading API...' : `Connected (${data.length} ticks)`}</p>
+        </div>
       </div>
-      <div className="flex items-center space-x-4">
+
+      {/* Timeline Scrubber */}
+      <div className="flex-1 max-w-2xl px-4 flex items-center gap-3">
+        <button onClick={togglePlay} className="p-1 text-stone-500 hover:text-amber-400 transition-colors" aria-label="Play/Pause" title={isPlaying ? "Pause" : "Auto-Play"}>
+          {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+        </button>
+        <button onClick={cycleSpeed} className="w-6 text-xs font-bold text-stone-500 hover:text-amber-400 transition-colors" title="Playback Speed">
+          {playbackSpeed}x
+        </button>
+        <span className="text-xs text-stone-500 uppercase font-bold ml-2">Timeline</span>
+        <input 
+          type="range" 
+          min={0} 
+          max={data.length > 0 ? data.length - 1 : 0} 
+          value={currentIndex}
+          onChange={handleScrubberChange}
+          className="w-full h-1 bg-[#333] rounded-lg appearance-none cursor-pointer accent-amber-500"
+          disabled={data.length === 0}
+        />
+        <button onClick={reset} className="p-1 text-stone-500 hover:text-amber-400 transition-colors" aria-label="Reset" title="Reset to start">
+          <RotateCcw size={14} />
+        </button>
+      </div>
+
+      <div className="flex items-center space-x-3">
         {currentTick && (
-          <div className="text-sm text-slate-300 mr-4">
-            Current Date: <span className="font-bold text-indigo-400">{currentTick.date}</span>
+          <div className="text-sm text-stone-300 mr-2 flex items-center gap-2 border border-[#333] px-3 py-1 bg-black">
+            <span>DATE:</span>
+            <span className="font-bold text-amber-400">{currentTick.date}</span>
           </div>
         )}
-        <button onClick={reset} className="p-2 bg-slate-800 rounded hover:bg-slate-700 transition" aria-label="Reset">
-          <RotateCcw size={18} />
-        </button>
-        <button onClick={togglePlay} className="p-2 bg-indigo-600 rounded hover:bg-indigo-500 transition" aria-label="Play/Pause">
-          {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-        </button>
-        <button onClick={fastForward} className={`p-2 rounded transition ${speedMs === 250 ? 'bg-indigo-500' : 'bg-slate-800 hover:bg-slate-700'}`} aria-label="Fast Forward">
-          <FastForward size={18} />
+        
+        {/* CSV Upload */}
+        <input 
+          type="file" 
+          accept=".csv" 
+          className="hidden" 
+          ref={fileInputRef} 
+          onChange={handleFileUpload} 
+        />
+        <button 
+          onClick={() => fileInputRef.current?.click()} 
+          className="p-1.5 px-3 flex items-center gap-2 text-xs font-bold uppercase bg-[#222] border border-[#444] text-stone-300 hover:bg-[#333] hover:text-amber-400 transition-colors"
+          title="Upload Custom CSV (Date, Close)"
+        >
+          <Upload size={14} />
+          <span>Upload CSV</span>
         </button>
       </div>
     </header>

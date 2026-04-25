@@ -1,17 +1,17 @@
 import Header from '@/components/Header';
 import TraditionalView from '@/components/TraditionalView';
 import ChaosView from '@/components/ChaosView';
-import AICopilot from '@/components/AICopilot';
+import QuantCopilot from '@/components/AICopilot';
 
 export default function Home() {
   return (
-    <main className="flex flex-col h-screen overflow-hidden bg-slate-950">
+    <main className="flex flex-col h-screen overflow-hidden bg-black text-stone-300 font-mono">
       <Header />
-      <div className="flex-1 grid grid-cols-10 h-full overflow-hidden p-4 gap-4">
+      <div className="flex-1 grid grid-cols-10 h-full overflow-hidden p-3 gap-3">
         <TraditionalView />
         <ChaosView />
-        <div className="col-span-2 bg-slate-900/40 rounded-xl p-4 border border-slate-800">
-          <AICopilot />
+        <div className="col-span-2 bg-[#0a0a0a] border border-[#333]">
+          <QuantCopilot />
         </div>
       </div>
     </main>

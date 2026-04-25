@@ -8,12 +8,13 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 export default function ChaosView() {
-  const { data, currentIndex, currentTick } = useSimulation();
+  const { data, currentIndex, currentTick, isLoadingData } = useSimulation();
   
   const visibleData = data.slice(0, currentIndex + 1);
   const trailing30Data = visibleData.slice(Math.max(0, visibleData.length - 30));
 
-  if (!currentTick) return <div className="p-4 border-r border-slate-800 bg-slate-900/20 h-full col-span-4">Loading...</div>;
+  if (isLoadingData) return <div className="p-4 border-r border-[#333] bg-[#0a0a0a] h-full col-span-4 text-stone-500 font-mono text-sm uppercase">Initializing Math Engine...</div>;
+  if (!currentTick) return <div className="p-4 border-r border-[#333] bg-[#0a0a0a] h-full col-span-4 text-stone-500 font-mono text-sm uppercase">Awaiting Chaos Metrics...</div>;
 
   // Prepare 3D Attractor Data
   const attractorX = trailing30Data.map(d => d.chaos.attractor_coords[0]);
@@ -25,15 +26,15 @@ export default function ChaosView() {
   const isCritical = currentTick.chaos.lyapunov > 1.0;
 
   return (
-    <div className="p-4 border-r border-slate-800 bg-slate-900/20 h-full flex flex-col gap-4 col-span-4">
-      <h2 className="text-lg font-semibold text-slate-200 flex justify-between items-center">
+    <div className="p-4 border-r border-[#333] bg-[#0a0a0a] h-full flex flex-col gap-4 col-span-4 font-mono">
+      <h2 className="text-sm font-bold text-stone-300 uppercase tracking-widest border-b border-[#333] pb-2 flex justify-between items-center">
         <span>Chaos Engine</span>
-        {isCritical && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full animate-pulse border border-red-500/50">CRITICAL STATE</span>}
+        {isCritical && <span className="text-[10px] bg-amber-900/40 text-amber-500 px-2 py-0.5 border border-amber-700/50">CRITICAL STATE</span>}
       </h2>
 
       {/* 3D Attractor */}
-      <div className="flex-1 min-h-[250px] bg-slate-950/50 rounded-xl border border-slate-800 overflow-hidden relative shadow-inner">
-        <h3 className="text-sm text-slate-400 absolute top-4 left-4 z-10">Phase Space Attractor (30d)</h3>
+      <div className="flex-1 min-h-[250px] bg-[#111] border border-[#333] overflow-hidden relative p-3">
+        <h3 className="text-xs text-stone-500 absolute top-3 left-3 z-10 uppercase">Phase Space Attractor [30D delay-coord]</h3>
         <div className="w-full h-full flex items-center justify-center">
           <Plot
             data={[
@@ -44,13 +45,13 @@ export default function ChaosView() {
                 type: 'scatter3d',
                 mode: 'lines+markers',
                 marker: {
-                  size: 4,
+                  size: 3,
                   color: attractorZ,
-                  colorscale: 'Viridis',
+                  colorscale: 'YlOrRd',
                 },
                 line: {
-                  color: '#6366f1',
-                  width: 2,
+                  color: '#d97706',
+                  width: 1.5,
                 },
               },
             ]}
@@ -60,9 +61,9 @@ export default function ChaosView() {
               paper_bgcolor: 'rgba(0,0,0,0)',
               plot_bgcolor: 'rgba(0,0,0,0)',
               scene: {
-                xaxis: { showbackground: false, showgrid: false, zeroline: false, showticklabels: false },
-                yaxis: { showbackground: false, showgrid: false, zeroline: false, showticklabels: false },
-                zaxis: { showbackground: false, showgrid: false, zeroline: false, showticklabels: false },
+                xaxis: { showbackground: false, showgrid: true, gridcolor: '#333', zeroline: false, showticklabels: false },
+                yaxis: { showbackground: false, showgrid: true, gridcolor: '#333', zeroline: false, showticklabels: false },
+                zaxis: { showbackground: false, showgrid: true, gridcolor: '#333', zeroline: false, showticklabels: false },
                 camera: { eye: { x: 1.5, y: 1.5, z: 0.5 } }
               }
             }}
@@ -74,34 +75,36 @@ export default function ChaosView() {
       </div>
 
       {/* Health Score Gauge */}
-      <div className={`h-[80px] rounded-xl p-4 border transition-colors duration-500 flex items-center justify-between ${isCritical ? 'bg-red-900/20 border-red-800' : 'bg-slate-800/50 border-slate-700'}`}>
+      <div className={`p-3 border flex items-center justify-between ${isCritical ? 'bg-amber-950/20 border-amber-800' : 'bg-[#111] border-[#333]'}`}>
         <div>
-          <h3 className="text-sm text-slate-400">Chaos Health Score</h3>
-          <p className="text-xs text-slate-500">System Stability</p>
+          <h3 className="text-xs text-stone-500 uppercase">System Stability Index</h3>
+          <p className="text-[10px] text-stone-600 uppercase mt-1">Structural Health</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <div className="text-right">
-            <span className={`text-3xl font-bold transition-all ${isCritical ? 'text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]' : 'text-emerald-400'}`}>
+            <span className={`text-2xl font-bold ${isCritical ? 'text-amber-500' : 'text-stone-300'}`}>
               {health}
             </span>
-            <span className="text-slate-500 text-sm ml-1">/ 100</span>
+            <span className="text-stone-600 text-xs ml-1">/ 100</span>
           </div>
         </div>
       </div>
 
       {/* Lyapunov / Variance Chart */}
-      <div className="h-[200px] bg-slate-950/50 rounded-xl p-4 border border-slate-800 shadow-inner relative">
-        <h3 className="text-sm text-slate-400 mb-2">Lyapunov Exponent & Variance</h3>
+      <div className="h-[200px] bg-[#111] border border-[#333] p-3 relative">
+        <h3 className="text-xs text-stone-500 mb-2 uppercase">Lyapunov Proxy / Volatility</h3>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={visibleData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis dataKey="date" stroke="#64748b" tick={{fontSize: 10}} />
-            <YAxis yAxisId="left" stroke="#ef4444" tick={{fontSize: 10}} />
-            <YAxis yAxisId="right" orientation="right" stroke="#eab308" tick={{fontSize: 10}} />
-            <Tooltip contentStyle={{backgroundColor: '#0f172a', borderColor: '#1e293b'}} />
-            <ReferenceLine yAxisId="left" y={1.0} stroke="#ef4444" strokeDasharray="3 3" label={{position: 'insideTopLeft', value: 'Critical Threshold', fill: '#ef4444', fontSize: 10}} />
-            <Line yAxisId="left" type="monotone" dataKey="chaos.lyapunov" stroke="#ef4444" dot={false} strokeWidth={2} name="Lyapunov" />
-            <Line yAxisId="right" type="monotone" dataKey="chaos.variance_30d_pct_change" stroke="#eab308" dot={false} strokeWidth={2} name="Variance %" />
+            <CartesianGrid strokeDasharray="2 4" stroke="#222" />
+            <XAxis dataKey="date" stroke="#555" tick={{fontSize: 10, fill: '#888'}} tickMargin={10} minTickGap={30} />
+            <YAxis yAxisId="left" stroke="#d97706" tick={{fontSize: 10, fill: '#888'}} width={30} />
+            <YAxis yAxisId="right" orientation="right" stroke="#0284c7" tick={{fontSize: 10, fill: '#888'}} width={30} />
+            <Tooltip 
+              contentStyle={{backgroundColor: '#000', borderColor: '#444', fontFamily: 'monospace', fontSize: '11px', color: '#ccc'}} 
+            />
+            <ReferenceLine yAxisId="left" y={1.0} stroke="#d97706" strokeDasharray="3 3" />
+            <Line yAxisId="left" type="monotone" dataKey="chaos.lyapunov" stroke="#d97706" dot={false} strokeWidth={1.5} name="Lyapunov Proxy" isAnimationActive={false} />
+            <Line yAxisId="right" type="monotone" dataKey="chaos.variance_30d_pct_change" stroke="#0284c7" dot={false} strokeWidth={1.5} name="Variance (scaled)" isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>

@@ -1,21 +1,24 @@
 "use client";
 import React, { useEffect, useState, useRef } from 'react';
 import { useSimulation } from '@/app/contexts/SimulationContext';
+import { Activity, AlertOctagon, TerminalSquare, Database } from 'lucide-react';
 
-export default function AICopilot() {
-  const { currentTick, currentIndex, isPlaying } = useSimulation();
+export default function QuantCopilot() {
+  const { currentTick, currentIndex } = useSimulation();
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPayload, setShowPayload] = useState(false);
   const [displayedText, setDisplayedText] = useState("");
   const lastAnalyzedIndex = useRef(-1);
 
-  // Trigger analysis every 10 ticks, or if lyapunov > 1.0 (once per threshold crossing)
+  const isCritical = (currentTick?.chaos?.lyapunov ?? 0) > 1.0;
+
+  // Trigger analysis every 10 ticks, or if lyapunov > 1.0
   useEffect(() => {
     if (!currentTick) return;
 
-    const isCritical = currentTick.chaos.lyapunov > 1.0;
-    const shouldTrigger = (currentIndex > 0 && currentIndex % 10 === 0) || (isCritical && lastAnalyzedIndex.current !== currentIndex);
+    const isCriticalNow = currentTick.chaos.lyapunov > 1.0;
+    const shouldTrigger = (currentIndex > 0 && currentIndex % 10 === 0) || (isCriticalNow && lastAnalyzedIndex.current !== currentIndex);
 
     if (shouldTrigger && lastAnalyzedIndex.current !== currentIndex) {
       lastAnalyzedIndex.current = currentIndex;
@@ -32,7 +35,7 @@ export default function AICopilot() {
           setAnalysis(data.summary);
         } catch (e) {
           console.error(e);
-          setAnalysis("ERROR: Failed to synthesize risk state. AI Core Offline.");
+          setAnalysis("SYS_ERR: Failed to synthesize risk state. Computation Core Offline.");
         } finally {
           setLoading(false);
         }
@@ -42,7 +45,7 @@ export default function AICopilot() {
     }
   }, [currentIndex, currentTick]);
 
-  // Typewriter effect
+  // Terminal typewriter effect
   useEffect(() => {
     if (analysis) {
       let i = 0;
@@ -51,50 +54,63 @@ export default function AICopilot() {
         setDisplayedText(prev => prev + analysis.charAt(i));
         i++;
         if (i >= analysis.length) clearInterval(timer);
-      }, 30);
+      }, 20);
       return () => clearInterval(timer);
     }
   }, [analysis]);
 
   return (
-    <div className="h-full flex flex-col gap-4 col-span-2">
-      <h2 className="text-lg font-semibold animate-pulse text-indigo-400 flex items-center gap-2">
-        <span className="text-red-500">🚨</span> AI Risk Synthesis <span className="text-red-500">🚨</span>
-      </h2>
-
-      <div className="flex-1 bg-slate-950/80 border border-indigo-900/50 rounded-xl p-4 font-mono text-sm overflow-y-auto shadow-[0_0_15px_rgba(79,70,229,0.1)] relative">
-        <div className="absolute top-2 right-2 flex gap-1">
-          <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-emerald-500 animate-ping' : 'bg-slate-700'}`}></div>
+    <div className="h-full flex flex-col gap-3 col-span-2 font-mono">
+      <div className="flex items-center justify-between border-b border-[#333] pb-2">
+        <h2 className="text-xs font-bold uppercase text-stone-300 flex items-center gap-2">
+          {isCritical ? (
+            <AlertOctagon className="w-4 h-4 text-amber-500" />
+          ) : (
+            <Activity className="w-4 h-4 text-stone-400" />
+          )}
+          {isCritical ? <span className="text-amber-500 bg-amber-950/50 px-2">CRITICAL THREAT</span> : "Risk Synthesis"}
+        </h2>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-stone-500 uppercase">
+            STATUS: ONLINE
+          </span>
+          <div className={`w-2 h-2 ${isCritical ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`}></div>
         </div>
-        
-        {loading ? (
-          <div className="text-indigo-400 flex items-center gap-2 mt-4">
-            <span className="animate-spin">🌀</span> Synthesizing telemetry...
-          </div>
-        ) : analysis ? (
-          <div className="text-slate-300 leading-relaxed mt-2">
-            {displayedText}
-            {!loading && displayedText.length === analysis.length && (
-              <span className="inline-block w-2 h-4 ml-1 bg-indigo-500 animate-pulse translate-y-1" />
-            )}
-          </div>
-        ) : (
-          <div className="text-slate-600 mt-4 italic">
-            Awaiting sufficient telemetry data...
-          </div>
-        )}
+      </div>
+
+      <div className={`flex-1 overflow-hidden bg-[#111] border ${isCritical ? 'border-amber-700/50' : 'border-[#333]'} p-4 text-sm transition-colors duration-200`}>
+        <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[#444]">
+          {loading ? (
+            <div className="text-stone-400 flex items-center gap-3 mt-2">
+              <Database className="w-4 h-4 animate-pulse" />
+              <span className="uppercase text-xs tracking-wider text-amber-600/80">Processing Telemetry...</span>
+            </div>
+          ) : analysis ? (
+            <div className={`leading-relaxed text-xs tracking-wide ${isCritical ? 'text-amber-400' : 'text-stone-300'}`}>
+              {displayedText}
+              {!loading && displayedText.length === analysis.length && (
+                <span className={`inline-block w-2.5 h-4 ml-1 align-middle ${isCritical ? 'bg-amber-500' : 'bg-stone-400'} animate-pulse`} />
+              )}
+            </div>
+          ) : (
+            <div className="text-[#555] mt-2 flex items-center gap-2 text-xs uppercase">
+              <TerminalSquare className="w-4 h-4" />
+              Awaiting sufficient data blocks...
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mt-auto">
         <button 
           onClick={() => setShowPayload(!showPayload)}
-          className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 rounded transition border border-slate-700 hover:border-slate-600"
+          className={`w-full py-2 text-[10px] font-bold uppercase border transition-colors ${showPayload ? 'bg-[#222] text-amber-500 border-amber-900/50' : 'bg-[#111] text-stone-400 border-[#333] hover:bg-[#222] hover:text-stone-200'}`}
         >
-          {showPayload ? 'Hide Payload' : '[View Payload]'}
+          {showPayload ? '[- CLOSE SYS_LOGS]' : '[+ VIEW SYS_LOGS]'}
         </button>
         
         {showPayload && currentTick && (
-          <div className="mt-2 p-2 bg-black rounded text-[10px] text-emerald-400 font-mono overflow-x-auto h-[150px] overflow-y-auto border border-emerald-900/30">
+          <div className="mt-2 p-3 bg-[#0a0a0a] text-[10px] text-green-600/80 font-mono overflow-x-auto h-[160px] overflow-y-auto border border-[#222]">
             <pre>{JSON.stringify(currentTick, null, 2)}</pre>
           </div>
         )}
