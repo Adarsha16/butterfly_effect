@@ -1,4 +1,4 @@
-# Quant-Terminal v2.1: Tail-Risk Early Warning System 📉🌪️
+# Quant-Terminal v2.1: Tail-Risk Early Warning System 
 
 Quant-Terminal is an advanced quantitative finance dashboard designed to detect systemic market fragility and predict tail-risk events (crashes) before they happen. By combining traditional technical analysis with non-linear dynamics (Chaos Theory) and an AI-powered risk synthesis engine, it provides institutional-grade insights into market stability.
 
